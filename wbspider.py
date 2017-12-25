@@ -1,3 +1,5 @@
+# -*- coding: utf-8 -*-
+
 import sys
 import time
 import os
@@ -21,12 +23,12 @@ user_list = ["chandrasekar1994","nevillegoutham","realtorbeeler","bridget.ross.7
 
 data_path = "data"
 ana_data_path = "data/analysis"
-max_deepth = 0
+max_deepth = 1
 debug_print = 1
 seperate_str = "###"
 statistic_begin_char = ":"
-seed_id = "chandrasekar1994"
-friend_list_path = data_path + "/fb_friendslist_"+ seed_id + ".txt"
+seed_id = "2485659250"
+seed_user_info_path = data_path + "/wb_seed_user_" + seed_id + ".txt"
 ana_yes_list = ana_data_path + "/" + seed_id + "_" +"analysisresult_yes.txt"
 ana_no_list = ana_data_path + "/" + seed_id + "_" +"analysisresult_no.txt"
 ana_data_set_path = ana_data_path +  "/" + seed_id + "_" +"analysis_dataset.txt"
@@ -37,28 +39,41 @@ data_type = {"tvshow":"tv","music":"music","checkin":"map","group":"groups","fri
         ,"likelist":"likes","educationandwork":"about?section=education","movie":"movies","livein":"about?section=living","sport":"sports"}
 
 #####################################################################
+def getcfginfo(driver):
+    html_source = driver.page_source
+    str_ps = html_source.find("$CONFIG['uid']")
+    str_pe = html_source.find(";",str_ps)
+    u_id = html_source[str_ps+16:str_pe-1]
+    str_ps = html_source.find("$CONFIG['oid']='")
+    str_pe = html_source.find(";", str_ps)
+    o_id = html_source[str_ps + 16: str_pe - 1]
+    return (u_id,o_id)
+
+def getuserinfofilepath(userid):
+    return data_path + "/wb_seed_user_" + userid + ".txt"
+
 def scroll(driver):
     driver.execute_script("""   
-        (function () {   
-            var y = document.body.scrollTop;   
-            var step = 1000;   
-            window.scroll(0, y);   
+           (function () {   
+               var y = document.body.scrollTop;   
+               var step = 1000;   
+               window.scroll(0, y);   
 
-            function f() {   
-                if (y < document.body.scrollHeight) {   
-                    y += step;   
-                    window.scroll(0, y);   
-                    setTimeout(f, 100);   
-                }  
-                else {   
-                    window.scroll(0, y);   
-                    document.title += "scroll-done";   
-                }   
-            }   
+               function f() {   
+                   if (y < document.body.scrollHeight) {   
+                       y += step;   
+                       window.scroll(0, y);   
+                       setTimeout(f, 100);   
+                   }  
+                   else {   
+                       window.scroll(0, y);   
+                       document.title += "scroll-done";   
+                   }   
+               }   
 
-            setTimeout(f, 1000);   
-        })();   
-        """)
+               setTimeout(f, 1000);   
+           })();   
+           """)
 
 
 def fb_getusersinfo(driver,listfile):
@@ -96,27 +111,7 @@ def fb_user_allinfo(driver,user):
 
         driver.get(url)
         driver.implicitly_wait(10)
-        if fb_auto_scroll(driver, url):
-            if k == "tvshow":
-                fb_tvshow(driver, f)
-            elif k == "music":
-                fb_music(driver, f)
-            elif k == "checkin":
-                fb_checkin(driver, f)
-            elif k == "group":
-                fb_group(driver, f)
-            elif k == "friendlist":
-                fb_friendslist(driver, f)
-            elif k == "likelist":
-                fb_likelist(driver, f)
-            elif k == "educationandwork":
-                fb_education(driver, f)
-            elif k == "movie":
-                fb_movie(driver, f)
-            elif k == "livein":
-                fb_livein(driver, f)
-            elif k == "sport":
-                fb_sport(driver,f)
+
         f.flush()
     f.close()
 
@@ -139,187 +134,52 @@ def fb_auto_scroll(driver,url):
     return bValid
 
 
-def fb_spider(username, password,fpath):
-    driver = webdriver.Chrome()
-    driver.get('https://www.facebook.com')
-    driver.find_element_by_id('email').send_keys(username)
-    driver.find_element_by_id('pass').send_keys(password)
-    driver.find_element_by_id('login_form').submit()
-    driver.implicitly_wait(10)
-    fb_getusersinfo(driver,fpath)
+def wb_user_ids(driver,f):
+    cfginfo = getcfginfo(driver)
+    f.write('userids \n')
+    f.write(cfginfo[0])
+    f.write('\n')
+    f.write(cfginfo[1])
+    f.write('\n')
+    return cfginfo[1]
 
 
-#education
-def fb_education(driver,f):
-    f.write("educationandwork\n");
-    id_name  = "pagelet_eduwork";
+#info
+def wb_basic_info(driver,f):
+    tag_name = "WB_frame_c"
     try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"),"html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next_element.next.next.next.next.next.next.next.contents[0])
-            f.write('\n');
-
-    except Exception as e:
-        print ("educationandwork ")
-        print ("Exception found", format(e))
-
-
-#hometown and livein place
-def fb_livein(driver,f):
-    f.write("livein\n");
-    id_name = "pagelet_hometown";
-    try:
-        eles = driver.find_element_by_id(id_name)
+        eles = driver.find_element_by_class_name(tag_name)
         data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next.next.next_sibling.next.next.next.next_element.text)
+
+        lists = data_soup.find_all("li")
+        for lt in lists:
+            f.write(lt.text.replace('\t',''))
             f.write('\n');
 
-    except Exception as e:
-        print ("livein ")
-        print ("Exception found", format(e))
-
-#group
-def fb_group(driver, f):
-    f.write("group\n");
-    id_name = "pagelet_timeline_medley_groups";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next.next_sibling.next.next_sibling.next_element.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("group ")
-        print ("Exception found", format(e))
-
-
-# chekcin
-def fb_checkin(driver, f):
-    f.write("checkin\n");
-    id_name = "pagelet_timeline_medley_map";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            place = child.next.next.next_sibling.text
-            if place.lower() != "report":
-                f.write(place)
-            else:
-                f.write(child.next.next_element.next_element.next_sibling.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("checkin ")
-        print ("Exception found", format(e))
-
-# music
-def fb_music(driver, f):
-    f.write("music\n");
-    id_name = "pagelet_timeline_medley_music";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next_sibling.next.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("music ")
-        print ("Exception found", format(e))
-
-#movie
-def fb_movie(driver, f):
-    f.write("movie\n");
-    id_name = "pagelet_timeline_medley_movies";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next_sibling.next.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("movie ")
-        print ("Exception found", format(e))
-
-
-# tv shows
-def fb_tvshow(driver, f):
-    f.write("tvshow\n");
-    id_name = "pagelet_timeline_medley_tv";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next_sibling.next.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("tvshow ")
-        print ("Exception found", format(e))
-
-#sport
-def fb_sport(driver,f):
-    f.write("sport\n");
-    id_name = "pagelet_timeline_medley_sports";
-    try:
-        eles = driver.find_element_by_id(id_name)
-        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        data_list = data_soup.find_all("li")
-        for child in data_list:
-            f.write(child.next.next.next_sibling.next.text)
-            f.write('\n');
-
-    except Exception as e:
-        print ("sport ")
-        print ("Exception found", format(e))
-
-
-#analysis like
-def fb_likelist(driver,f):
-    f.write("likelist\n");
-    like_top_partname  = "pagelet_timeline_medley_likes";
-    try:
-        eles = driver.find_element_by_id(like_top_partname)
-        like_soup = BeautifulSoup(eles.get_attribute("innerHTML"),"html5lib")
-        lile_list = like_soup.find_all("li")
-        for child in lile_list:
-            f.write(child.next.next.next.next_sibling.next.next.next.next.next.contents[0])
-            f.write('\n');
 
     except Exception as e:
         print ("likelist ")
         print ("Exception found", format(e))
 
 
+
 #analysis friends
-def fb_friendslist(driver,f):
-    f.write("friendlist\n");
-    friends_id_name = "pagelet_timeline_medley_friends"
+def wb_fansorfollow_list(driver, f):
+    user_lists = "uidList"
     try:
-        eles = driver.find_element_by_id(friends_id_name)
-        elesoup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
-        eles = elesoup.find_all("div",class_ = "uiProfileBlockContent")
-        for child in eles:
-            f.write(child.next.next.next_sibling.next.text)
-            f.write(" #### ")
-            f.write(fb_extrac_link(str(child.next.next.next_sibling.next)))
+        val = driver.find_element_by_name(user_lists).get_attribute("value")
+        ids = val.split(",")
+        for id in ids:
+            f.write("####"+id)
             f.write('\n');
+
+        val = driver.find_element_by_name('mp').get_attribute("value")
+        return int(val)
 
     except Exception as e:
         print ("friendlist ")
         print ("Exception found", format(e))
-
+        return 0
 
 def fb_extract_friendname(str):
     s1 = str.find("\"Add ")
@@ -344,13 +204,13 @@ def fb_extrac_userid(str):
 
 
 ###############################################################################################
-def set_network_seed(username, password,userid):
+def network_login(username, password, userid):
 
     url = "http://www.weibo.com/login.php"
     driver = webdriver.Chrome()
     driver.maximize_window()
     driver.get(url)
-
+    driver.implicitly_wait(10)
     userui = driver.find_element_by_id('loginname')
     userui.clear()
     userui.send_keys(username)
@@ -359,43 +219,78 @@ def set_network_seed(username, password,userid):
     pswui.send_keys(password)
     driver.find_element_by_xpath('//*[@id="pl_login_form"]/div/div[3]/div[6]/a').click()
 
-    driver.implicitly_wait(10)
-    explor_network(driver, userid, 0, "wb+")
+    explor_basicinfo_by_userid(driver, userid, 0, "wb")
     driver.quit()
 
 
 
-def explor_network(driver,user,deepth,mode):
+def explor_basicinfo_by_userid(driver, user, deepth, mode):
     if (user == "") | (user == " "):
         return
     if(deepth > max_deepth):
         return
 
-    path = friend_list_path
+    path = getuserinfofilepath(user)
     f = open(path, mode);
-
     f.write('\n')
-    url = "https://www.facebook.com/" + user + "/friends_all"
+
+
+    #basic info
+    f.write("basicinfo\n");
+    url = "https://weibo.com/" + user + "/info?"
     driver.get(url)
-    driver.implicitly_wait(10)
-    if fb_auto_scroll(driver, url):
-        fb_friendslist(driver, f)
+    driver.implicitly_wait(3)
+
+    userid = wb_user_ids(driver,f)
+
+    wb_basic_info(driver, f)
     f.flush()
+
+    #fans list
+    f.write("fanslist\n");
+    n_page = 1
+    ncur_page = 0
+    while ncur_page < n_page:
+        url = "https://weibo.cn/" + user + "/fans?page="+str(ncur_page+1)
+        driver.get(url)
+        driver.implicitly_wait(1)
+        n_page = wb_fansorfollow_list(driver, f)
+        if n_page <= 0:
+            break;
+        ncur_page += 1
+        f.flush()
+
+    #follow list
+    f.write("\n");
+    f.write("followlist\n");
+    n_page = 1
+    ncur_page = 0
+    while ncur_page < n_page:
+        url = "https://weibo.cn/" + user + "/follow?page="+str(ncur_page+1)
+        driver.get(url)
+        driver.implicitly_wait(1)
+        n_page = wb_fansorfollow_list(driver, f)
+        if n_page <= 0:
+            break;
+        ncur_page += 1
+        f.flush()
 
     f.close()
 
     userlist = [];
-    with open(path) as f:
-        for line in f:
-            userlist.append(fb_extrac_userid(line))
-    f.close()
+    with open(path) as ff:
+        for line in ff:
+            if line.count('###') > 0 :
+                userlist.append(line[4:-1])
+        ff.close()
 
     for userid in userlist:
-        explor_network(driver,userid,deepth+1,"ab+")
+        explor_basicinfo_by_userid(driver, userid, deepth + 1, "ab+")
+
 
 ################################################################################################
 def comm_create_userlist():
-    path = friend_list_path
+    path = seed_user_info_path
     user_list[:] = [];
     with open(path) as f:
         for line in f:
@@ -613,13 +508,13 @@ if __name__ == '__main__':
 
         username = sys.argv[1]
         password = sys.argv[2]
-        if len(sys.argv) > 3:
+        if len(sys.argv) >= 3:
             seed_id = sys.argv[3]
     except IndexError:
         print 'Usage: %s <username> <password> <id>' % sys.argv[0]
     else:
 
-        set_network_seed(username, password, seed_id)
+        network_login(username, password, seed_id)
         #fb_spider(username, password, friend_list_path)
         #ana_friends_comm()
         #statistic_ana_attributes()
