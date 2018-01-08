@@ -66,6 +66,21 @@ def extractnumber(s):
     return ns
 
 
+def extractnumbers(s):
+    nums = []
+
+    ns = ""
+    for c in s:
+        if c  <= '9' and c >= '0':
+            ns += c
+        else:
+            if(len(ns) > 0):
+                nums.append(ns)
+            ns = ""
+    return nums
+
+
+
 def scroll(driver):
     driver.execute_script("""   
            (function () {   
@@ -88,46 +103,6 @@ def scroll(driver):
                setTimeout(f, 1000);   
            })();   
            """)
-
-
-def fb_getusersinfo(driver,listfile):
-    if False == os.path.exists(data_path):
-        os.mkdir(data_path)
-    if False == os.path.exists(listfile):
-        for user in user_list:
-            fb_user_allinfo(driver,user)
-    else:
-        with open(listfile) as f:
-            for line in f:
-                if (line == "\n") | (line == "") | (line == " ") | (line == "friendlist\n"):
-                    continue
-                fb_user_allinfo(driver, line)
-        f.close()
-
-
-def fb_user_allinfo(driver,user):
-    if (user == "") | (user == " "):
-        return
-
-    bID = (user.find("id=") != -1)
-    user =fb_extrac_userid(user)
-
-    f = open(data_path + "/" + user + ".txt", "w+");
-    f.write(user + '\n')
-
-    for k,v in data_type.items():
-
-        f.write('\n')
-        if bID:
-            url = "https://www.facebook.com/profile.php?id=" + user + "&sk=" + v
-        else:
-            url = "https://www.facebook.com/" + user + "/" + v
-
-        driver.get(url)
-        driver.implicitly_wait(10)
-
-        f.flush()
-    f.close()
 
 
 def auto_scroll(driver,url):
@@ -247,10 +222,6 @@ def network_login(username, password, userid):
     driver.find_element_by_xpath('//*[@id="pl_login_form"]/div/div[3]/div[6]/a').click()
 
     explor_basicinfo_by_userid(driver, userid, 0, "wb")
-
-    driver.implicitly_wait(3)
-    explor_postinfo_by_userid(driver,userid)
-
     driver.quit()
 
 
@@ -307,8 +278,9 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
         f.flush()
 
     f.close()
-    #post list
 
+    #post list
+    explor_postinfo_by_userid(driver,userid)
 
     userlist = [];
     with open(path) as ff:
@@ -349,11 +321,10 @@ def explor_postinfo_by_userid(driver,uid):
                 f.write(" #")
                 f.write(ls.contents[1].contents[5].contents[3].contents[3].contents[0])#device
                 f.write(" #")
-                f.write(ls.contents[3].contents[1].contents[1].contents[3].contents[1].contents[0].contents[0].contents[0].contents[1].text)#repost
-                f.write(" #")
-                f.write(ls.contents[3].contents[1].contents[1].contents[5].contents[1].contents[0].contents[0].contents[0].contents[1].text)#comments
-                f.write(" #")
-                f.write(ls.contents[3].contents[1].contents[1].contents[7].contents[3].contents[0].contents[0].contents[1].contents[1].text)#like
+                nums = extractnumbers(ls.contents[3].text.replace('\n', ' '))
+                for num in nums:
+                    f.write(num)
+                    f.write("#")
                 f.write('\n');
 
         except Exception as e:
@@ -389,7 +360,6 @@ def ana_friends_comm():
         for j in range(0,len(user_list)):
             if i != j:
                 find_comm_simple(user_list[i],user_list[j])
-
 
 
 def find_comm_simple(user1,user2):
@@ -491,36 +461,6 @@ def read_user_file(user):
 
 ##########################################################################
 #statistic analysis
-def statistic_ana_attributes():
-    sta_yes = count_attributes(ana_yes_list)
-    sta_no = count_attributes(ana_no_list)
-
-    color = ['r','g']
-    statistic_plot(sta_yes,'yes','r')
-    statistic_plot(sta_no, 'no', 'g')
-
-
-def statistic_plot(data,label,c):
-    for k,v in data.items():
-        unique_n, counts_n = numpy.unique(v, return_counts=True)
-
-        pos = numpy.arange(len(unique_n))
-        width = 1.0  # gives histogram aspect to the bar diagram
-
-        ax = plt.axes()
-        ax.set_xticks(unique_n)
-        ax.set_xticklabels(unique_n)
-
-        asum = sum(counts_n)
-        avgfrq = [float(j) / asum for j in counts_n]
-
-        plt.bar(pos, avgfrq, width, color=c,label=label + " "+ k)
-        plt.legend(loc='upper right')
-        plt.savefig(ana_data_path + "/" + k +"_" + seed_id  + label +"_.png")
-        plt.clf()
-        plt.cla()
-        plt.close()
-
 
 def count_attributes(fpath):
     statinfo = dict.fromkeys(data_type)
@@ -549,35 +489,6 @@ def count_attributes(fpath):
     return statinfo
 
 
-def transform_dataset(fpath,result,p = 0.7,maxc = 1000):
-    #class atr1 atr2 ....
-    fana = open(ana_data_set_path, "ab+")
-    ftest = open(test_data_set_path,"ab+")
-    rcount = 0
-    with open(fpath) as f:
-        for line in f:
-            pos = line.find(statistic_begin_char)
-            if rcount > maxc:
-                break;
-            rcount += 1
-
-            if pos >= 0:
-                if p > random.uniform(0, 1):
-                    fana.write(result)
-                    fana.write(line[pos+1:])
-                else:
-                    ftest.write(result)
-                    ftest.write(line[pos + 1:])
-    f.close()
-    fana.close()
-    ftest.close()
-
-
-def creat_dataset(f):
-    transform_dataset(ana_yes_list,'1',f)
-    transform_dataset(ana_no_list,'0',f)
-
-
 
 if __name__ == '__main__':
     try:
@@ -596,4 +507,3 @@ if __name__ == '__main__':
         #fb_spider(username, password, friend_list_path)
         #ana_friends_comm()
         #statistic_ana_attributes()
-        creat_dataset(0.7)
