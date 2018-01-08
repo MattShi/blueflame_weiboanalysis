@@ -49,8 +49,22 @@ def getcfginfo(driver):
     o_id = html_source[str_ps + 16: str_pe - 1]
     return (u_id,o_id)
 
+
 def getuserinfofilepath(userid):
-    return data_path + "/wb_seed_user_" + userid + ".txt"
+    return data_path + "/wb_user_info" + userid + ".txt"
+
+
+def getuserpostsfilepath(userid):
+    return data_path + "/wb_user_posts" + userid + ".txt"
+
+
+def extractnumber(s):
+    ns = ""
+    for c in s:
+        if c  <= '9' and c >= '0':
+            ns += c
+    return ns
+
 
 def scroll(driver):
     driver.execute_script("""   
@@ -116,7 +130,7 @@ def fb_user_allinfo(driver,user):
     f.close()
 
 
-def fb_auto_scroll(driver,url):
+def auto_scroll(driver,url):
     bauto = True
     last_height = driver.execute_script("return document.body.scrollHeight")
     bValid = (driver.current_url == url)
@@ -136,7 +150,7 @@ def fb_auto_scroll(driver,url):
 
 def wb_user_ids(driver,f):
     cfginfo = getcfginfo(driver)
-    f.write('userids \n')
+    f.write('#userids \n')
     f.write(cfginfo[0])
     f.write('\n')
     f.write(cfginfo[1])
@@ -146,9 +160,21 @@ def wb_user_ids(driver,f):
 
 #info
 def wb_basic_info(driver,f):
-    tag_name = "WB_frame_c"
+    tag_name_d = "WB_frame_c"
+    tag_name_c = "PCD_counter"
     try:
-        eles = driver.find_element_by_class_name(tag_name)
+        #fans weibo follow number
+        eles = driver.find_element_by_class_name(tag_name_c)
+        data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
+        f.write("##numbers\n")
+        lists = data_soup.find_all("td")
+        for lt in lists:
+            f.write(extractnumber(lt.text.replace('\t','')))
+            f.write('\n');
+
+        #detail
+        f.write("##detail\n")
+        eles = driver.find_element_by_class_name(tag_name_d)
         data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
 
         lists = data_soup.find_all("li")
@@ -180,6 +206,7 @@ def wb_fansorfollow_list(driver, f):
         print ("friendlist ")
         print ("Exception found", format(e))
         return 0
+
 
 def fb_extract_friendname(str):
     s1 = str.find("\"Add ")
@@ -220,6 +247,10 @@ def network_login(username, password, userid):
     driver.find_element_by_xpath('//*[@id="pl_login_form"]/div/div[3]/div[6]/a').click()
 
     explor_basicinfo_by_userid(driver, userid, 0, "wb")
+
+    driver.implicitly_wait(3)
+    explor_postinfo_by_userid(driver,userid)
+
     driver.quit()
 
 
@@ -236,7 +267,7 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
 
 
     #basic info
-    f.write("basicinfo\n");
+    f.write("#basicinfo\n");
     url = "https://weibo.com/" + user + "/info?"
     driver.get(url)
     driver.implicitly_wait(3)
@@ -247,7 +278,7 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
     f.flush()
 
     #fans list
-    f.write("fanslist\n");
+    f.write("#fanslist\n");
     n_page = 1
     ncur_page = 0
     while ncur_page < n_page:
@@ -262,7 +293,7 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
 
     #follow list
     f.write("\n");
-    f.write("followlist\n");
+    f.write("#followlist\n");
     n_page = 1
     ncur_page = 0
     while ncur_page < n_page:
@@ -276,6 +307,8 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
         f.flush()
 
     f.close()
+    #post list
+
 
     userlist = [];
     with open(path) as ff:
@@ -286,6 +319,51 @@ def explor_basicinfo_by_userid(driver, user, deepth, mode):
 
     for userid in userlist:
         explor_basicinfo_by_userid(driver, userid, deepth + 1, "ab+")
+
+
+def explor_postinfo_by_userid(driver,uid):
+    path = getuserpostsfilepath(uid)
+    f = open(path, "ab+");
+    f.write('\n')
+
+    npageidx = 1
+    while(npageidx < 20):
+        url = "https://weibo.com/u/"+ uid + "?profile_ftype=1&is_all=1&page=" + str(npageidx)
+        driver.get(url)
+        driver.implicitly_wait(3)
+        auto_scroll(driver,url)
+
+        try:
+
+            posts_tag = "WB_frame_c"
+            post_cls = "WB_feed_detail clearfix"
+            post_statistic="WB_feed_handle"
+
+            # fans weibo follow number
+            eles = driver.find_element_by_class_name(posts_tag)
+            data_soup = BeautifulSoup(eles.get_attribute("innerHTML"), "html5lib")
+            f.write("\n")
+            ls_detail = data_soup.findAll("div", class_="WB_cardwrap WB_feed_type S_bg2 WB_feed_like ")
+            for ls in ls_detail:
+                f.write(ls.contents[1].contents[5].contents[3].contents[1].attrs['title'])#time
+                f.write(" #")
+                f.write(ls.contents[1].contents[5].contents[3].contents[3].contents[0])#device
+                f.write(" #")
+                f.write(ls.contents[3].contents[1].contents[1].contents[3].contents[1].contents[0].contents[0].contents[0].contents[1].text)#repost
+                f.write(" #")
+                f.write(ls.contents[3].contents[1].contents[1].contents[5].contents[1].contents[0].contents[0].contents[0].contents[1].text)#comments
+                f.write(" #")
+                f.write(ls.contents[3].contents[1].contents[1].contents[7].contents[3].contents[0].contents[0].contents[1].contents[1].text)#like
+                f.write('\n');
+
+        except Exception as e:
+            print ("posts ")
+            print ("Exception found", format(e))
+        npageidx+=1
+    f.close()
+
+
+
 
 
 ################################################################################################
